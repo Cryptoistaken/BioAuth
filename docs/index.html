@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<meta name="theme-color" content="#0f172a" />
+		<meta name="description" content="BioKey — Your fingerprint. Your identity. No middleman. Open-source biometric identity protocol." />
+		<title>BioKey — Open Biometric Identity Protocol</title>
+		<link rel="stylesheet" href="/src/style.css" />
+	</head>
+	<body>
+		<nav>
+			<div class="nav-inner">
+				<div class="logo">
+					<div class="logo-icon">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M12 2a4 4 0 0 1 4 4c0 1.5-.5 2.8-1.3 3.8"/>
+							<path d="M8 6a4 4 0 0 0-.7 2.2C7.1 10.5 8 13 8 16"/>
+							<path d="M12 2C9.8 2 8 3.8 8 6c0 2 .8 3.8 2 5"/>
+							<path d="M16 10c.7 1 1 2.2 1 3.5 0 3-1.3 5.5-3 7"/>
+							<path d="M12 22c-1.7-1.5-3-4-3-7 0-1.3.3-2.5.8-3.5"/>
+							<circle cx="12" cy="12" r="1"/>
+						</svg>
+					</div>
+					<span class="logo-text">Bio<span>Key</span></span>
+				</div>
+				<div class="nav-links">
+					<a href="#how">How it works</a>
+					<a href="#packages">Packages</a>
+					<a href="#protocol">Protocol</a>
+					<a href="https://github.com/biokey-protocol" target="_blank" rel="noopener">GitHub</a>
+				</div>
+			</div>
+		</nav>
+
+		<main>
+			<section class="hero">
+				<div class="hero-badge">Open Protocol</div>
+				<h1>Your fingerprint.<br /><span>Your identity.</span><br />No middleman.</h1>
+				<p class="hero-sub">BioKey is the open-source protocol that lets your fingerprint be your cryptographic identity. No passwords. No Apple. No Google. No biometric data on any server. Ever.</p>
+				<div class="hero-actions">
+					<a href="#packages" class="btn-primary">Get Started</a>
+					<a href="#protocol" class="btn-secondary">Read the Protocol</a>
+				</div>
+			</section>
+
+			<section class="compare" id="how">
+				<h2>Authentication is broken</h2>
+				<div class="compare-grid">
+					<div class="compare-card bad">
+						<div class="compare-label">Passwords</div>
+						<p>Weak, reused, constantly breached. The worst possible solution we all still use.</p>
+					</div>
+					<div class="compare-card bad">
+						<div class="compare-label">Passkeys</div>
+						<p>Better UX but your keys live in iCloud or Google Password Manager. They own your identity.</p>
+					</div>
+					<div class="compare-card bad">
+						<div class="compare-label">Biometrics on device</div>
+						<p>The fingerprint just unlocks a device-stored key. Lose the device, lose access.</p>
+					</div>
+					<div class="compare-card good">
+						<div class="compare-label">BioKey</div>
+						<p>Your fingerprint derives your key. On-device. Deterministic. No vendor. No storage.</p>
+					</div>
+				</div>
+			</section>
+
+			<section class="how-it-works">
+				<h2>How it works</h2>
+				<div class="pipeline">
+					<div class="step"><div class="step-num">1</div><div class="step-text">You scan your finger via WebAuthn</div></div>
+					<div class="arrow">→</div>
+					<div class="step"><div class="step-num">2</div><div class="step-text">Credential rawId goes through HKDF-SHA256</div></div>
+					<div class="arrow">→</div>
+					<div class="step"><div class="step-num">3</div><div class="step-text">256-bit identity seed derived</div></div>
+					<div class="arrow">→</div>
+					<div class="step"><div class="step-num">4</div><div class="step-text">Public key = your identity. Private key = signs challenges.</div></div>
+				</div>
+				<p class="pipeline-note">No biometric data leaves your device. The server stores only your public key.</p>
+			</section>
+
+			<section class="packages" id="packages">
+				<h2>Packages</h2>
+				<div class="pkg-grid">
+					<div class="pkg-card">
+						<div class="pkg-name">biokey-core</div>
+						<div class="pkg-desc">Pure JS. WebAuthn wrapper + HKDF key derivation. Zero dependencies.</div>
+						<pre><code>bun add biokey-core</code></pre>
+					</div>
+					<div class="pkg-card">
+						<div class="pkg-name">biokey-js</div>
+						<div class="pkg-desc">Browser SDK. Enrollment, authentication, local storage, optional server sync.</div>
+						<pre><code>bun add biokey-js</code></pre>
+					</div>
+					<div class="pkg-card">
+						<div class="pkg-name">biokey-react</div>
+						<div class="pkg-desc">React hook. <code>useBioKey()</code> — status, enroll, authenticate, reset.</div>
+						<pre><code>bun add biokey-react</code></pre>
+					</div>
+					<div class="pkg-card">
+						<div class="pkg-name">biokey-server</div>
+						<div class="pkg-desc">Bun + Hono auth server. Stores only public keys. Deploy to Railway.</div>
+						<pre><code>bun add biokey-server</code></pre>
+					</div>
+				</div>
+			</section>
+
+			<section class="protocol" id="protocol">
+				<h2>Protocol</h2>
+				<div class="proto-content">
+					<div class="proto-block">
+						<h3>Enrollment</h3>
+						<ol>
+							<li>Client calls <code>navigator.credentials.create()</code></li>
+							<li>Device triggers platform authenticator (fingerprint)</li>
+							<li>Client receives <code>credential.rawId</code></li>
+							<li>Client runs HKDF-SHA256 over <code>rawId</code> with fixed salt + info</li>
+							<li>256-bit seed stored locally as identity public key</li>
+							<li>Optional: <code>POST /enroll</code> with <code>{ userId, publicKey, deviceId }</code></li>
+						</ol>
+					</div>
+					<div class="proto-block">
+						<h3>Authentication</h3>
+						<ol>
+							<li>Client fetches challenge from server or generates locally</li>
+							<li>Client calls <code>navigator.credentials.get()</code> with stored credentialId</li>
+							<li>Device triggers platform authenticator (fingerprint)</li>
+							<li>If server: <code>POST /verify</code> with <code>{ userId, challenge }</code></li>
+							<li>Server checks challenge was issued, not expired, not replayed</li>
+							<li>Returns <code>{ verified: true, publicKey }</code></li>
+						</ol>
+					</div>
+				</div>
+			</section>
+
+			<section class="limitations">
+				<h2>Honest limitations</h2>
+				<div class="limit-grid">
+					<div class="limit-card">
+						<div class="limit-title">Cross-sensor variance</div>
+						<p>Different hardware sensors produce different raw data from the same finger. V1 works across your own enrolled devices. True device independence is a V2 goal.</p>
+					</div>
+					<div class="limit-card">
+						<div class="limit-title">PIN fallback</div>
+						<p>WebAuthn allows PIN/pattern as fallback — the OS controls this. Fingerprint-only enforcement requires a native app using Android BiometricPrompt.</p>
+					</div>
+					<div class="limit-card">
+						<div class="limit-title">Fingerprint is irrevocable</div>
+						<p>Unlike a password, you can't change your fingerprint. Liveness detection and multi-factor enrollment are recommended for high-security use cases.</p>
+					</div>
+				</div>
+			</section>
+		</main>
+
+		<footer>
+			<p>BioKey is open source. MIT License.</p>
+			<p class="footer-sub">No company owns this protocol. No biometric data on any server. Ever.</p>
+		</footer>
+
+		<script type="module" src="/src/main.js"></script>
+	</body>
+</html>

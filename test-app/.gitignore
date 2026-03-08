@@ -1,0 +1,4 @@
+# Covered by root .gitignore — local overrides only
+.vercel/
+dist/
+node_modules/
