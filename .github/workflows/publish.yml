@@ -1,0 +1,106 @@
+# Publish biokey-core, biokey-js, and biokey-react to npm
+# Triggered when a GitHub Release is created.
+#
+# Required repository secret:
+#   NPM_TOKEN — a granular npm access token with publish rights for all three packages
+#
+# To release:
+#   1. Bump version in each package.json
+#   2. Create a GitHub Release (tag: v0.x.x)
+#   3. This workflow runs automatically
+
+name: Publish to npm
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  # ─── Sanity check ────────────────────────────────────────────────────────────
+  # Validates that all three packages can be installed and their source files
+  # are present before any publish attempt is made.
+  check:
+    name: Check packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install biokey-core
+        working-directory: packages/biokey-core
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Install biokey-js
+        working-directory: packages/biokey-js
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Install biokey-react
+        working-directory: packages/biokey-react
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Verify source files exist
+        run: |
+          test -f packages/biokey-core/src/index.js
+          test -f packages/biokey-js/src/index.js
+          test -f packages/biokey-react/src/index.js
+          echo "All source files present."
+
+  # ─── Publish biokey-core ─────────────────────────────────────────────────────
+  publish-core:
+    name: Publish biokey-core
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Publish
+        working-directory: packages/biokey-core
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ─── Publish biokey-js ───────────────────────────────────────────────────────
+  publish-js:
+    name: Publish biokey-js
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Publish
+        working-directory: packages/biokey-js
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # ─── Publish biokey-react ────────────────────────────────────────────────────
+  publish-react:
+    name: Publish biokey-react
+    needs: publish-js   # biokey-react depends on biokey-js — publish js first
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org/
+
+      - name: Publish
+        working-directory: packages/biokey-react
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
