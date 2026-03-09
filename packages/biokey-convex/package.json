@@ -1,0 +1,15 @@
+{
+	"name": "biokey-convex",
+	"version": "0.1.0",
+	"private": false,
+	"description": "Convex backend for the BioKey protocol — drop-in alternative to biokey-server",
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"dev": "convex dev",
+		"deploy": "convex deploy"
+	},
+	"dependencies": {
+		"convex": "^1.17.0"
+	}
+}

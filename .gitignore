@@ -50,3 +50,5 @@ desktop.ini
 logs/
 npm-debug.log*
 bun-debug.log*
+
+package-lock.json

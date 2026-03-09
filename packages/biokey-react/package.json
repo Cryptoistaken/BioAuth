@@ -1,18 +1,27 @@
 {
 	"name": "biokey-react",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"type": "module",
 	"main": "./src/index.js",
 	"exports": {
 		".": "./src/index.js"
 	},
-	"files": ["src"],
+	"files": [
+		"src"
+	],
 	"peerDependencies": {
 		"react": ">=18"
 	},
 	"dependencies": {
 		"biokey-js": "^0.1.0"
 	},
-	"keywords": ["biometric", "webauthn", "fingerprint", "react", "hook", "identity"],
+	"keywords": [
+		"biometric",
+		"webauthn",
+		"fingerprint",
+		"react",
+		"hook",
+		"identity"
+	],
 	"license": "MIT"
 }

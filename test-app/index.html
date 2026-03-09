@@ -27,7 +27,7 @@
 
 		<div class="card">
 			<div class="card-header">
-				<span class="card-title">Phase 0 — Test Surface</span>
+				<span class="card-title">Convex — Test Surface</span>
 				<span class="state" id="state">Not Enrolled</span>
 			</div>
 
@@ -57,12 +57,17 @@
 			<div id="key-display" class="key-display">
 				<div class="key-label">Identity Key (public)</div>
 				<div id="key-value" class="key-value"></div>
+				<div class="badges">
+					<span id="method-badge" class="badge" style="display:none"></span>
+					<span id="server-badge" class="badge badge-server" style="display:none"></span>
+				</div>
 			</div>
 		</div>
 
 		<p class="note">
 			Requires HTTPS or localhost.<br />
-			No biometric data leaves your device.
+			No biometric data leaves your device.<br />
+			Backend: <a href="https://dashboard.convex.dev/d/pleasant-pelican-278" target="_blank" style="color:var(--accent);text-decoration:none">Convex ↗</a>
 		</p>
 
 		<script type="module" src="/src/main.js"></script>

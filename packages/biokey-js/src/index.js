@@ -8,20 +8,19 @@ function hexToBuf(hex) {
 	return new Uint8Array(hex.match(/.{2}/g).map(b => parseInt(b, 16))).buffer
 }
 
+function bufToBase64url(buf) {
+	return btoa(String.fromCharCode(...new Uint8Array(buf)))
+		.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
 const PRF_SALT = new TextEncoder().encode('biokey-prf-v2-salt')
 
-// ─── V1 fallback ──────────────────────────────────────────────────────────────
 async function deriveKeyRawId(rawId) {
 	const keyMaterial = await crypto.subtle.importKey(
 		'raw', rawId, { name: 'HKDF' }, false, ['deriveBits']
 	)
 	const bits = await crypto.subtle.deriveBits(
-		{
-			name: 'HKDF',
-			hash: 'SHA-256',
-			salt: new TextEncoder().encode('biokey-v1-salt'),
-			info: new TextEncoder().encode('biokey-identity-seed')
-		},
+		{ name: 'HKDF', hash: 'SHA-256', salt: new TextEncoder().encode('biokey-v1-salt'), info: new TextEncoder().encode('biokey-identity-seed') },
 		keyMaterial, 256
 	)
 	return new Uint8Array(bits)
@@ -32,14 +31,8 @@ function extractPRFOutput(credential) {
 	return first ? new Uint8Array(first) : null
 }
 
-async function deviceId() {
-	const raw = [
-		navigator.userAgent,
-		navigator.language,
-		screen.width,
-		screen.height,
-		Intl.DateTimeFormat().resolvedOptions().timeZone
-	].join('|')
+async function getDeviceId() {
+	const raw = [navigator.userAgent, navigator.language, screen.width, screen.height, Intl.DateTimeFormat().resolvedOptions().timeZone].join('|')
 	const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
 	return bufToHex(buf).slice(0, 16)
 }
@@ -61,15 +54,9 @@ export class BioKeyClient {
 		localStorage.removeItem(this.storageKey)
 	}
 
-	// ─── enroll ───────────────────────────────────────────────────────────────
-	// Attempts PRF enrollment first. Falls back to rawId-HKDF (V1) if the
-	// platform authenticator does not support the PRF extension.
-	// Returns { publicKey, credentialId, deviceId, enrolledAt, method }
 	async enroll(userId) {
 		const challenge = crypto.getRandomValues(new Uint8Array(32))
-		const uid = userId
-			? new TextEncoder().encode(userId)
-			: crypto.getRandomValues(new Uint8Array(16))
+		const uid = userId ? new TextEncoder().encode(userId) : crypto.getRandomValues(new Uint8Array(16))
 
 		const credential = await navigator.credentials.create({
 			publicKey: {
@@ -81,14 +68,8 @@ export class BioKeyClient {
 					{ alg: -8, type: 'public-key' },
 					{ alg: -257, type: 'public-key' }
 				],
-				authenticatorSelection: {
-					authenticatorAttachment: 'platform',
-					userVerification: 'required',
-					residentKey: 'preferred'
-				},
-				extensions: {
-					prf: { eval: { first: PRF_SALT } }
-				},
+				authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'preferred' },
+				extensions: { prf: { eval: { first: PRF_SALT } } },
 				timeout: 60000
 			}
 		})
@@ -106,40 +87,45 @@ export class BioKeyClient {
 		}
 
 		const credentialId = bufToHex(credential.rawId)
-		const did = await deviceId()
+		const did = await getDeviceId()
 		const identity = { publicKey, credentialId, deviceId: did, enrolledAt: Date.now(), method }
-
 		localStorage.setItem(this.storageKey, JSON.stringify(identity))
 
 		if (this.serverUrl && userId) {
 			await fetch(`${this.serverUrl}/enroll`, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ userId, publicKey, deviceId: did, method })
+				body: JSON.stringify({
+					userId,
+					publicKey,
+					deviceId: did,
+					method,
+					attestationObject: bufToBase64url(credential.response.attestationObject),
+					clientDataJSON: bufToBase64url(credential.response.clientDataJSON)
+				})
 			}).catch(() => {})
 		}
 
 		return identity
 	}
 
-	// ─── authenticate ─────────────────────────────────────────────────────────
-	// If PRF was used at enrollment, re-derives the key via PRF and validates
-	// it matches the stored publicKey. Falls back to rawId-HKDF V1 if needed.
 	async authenticate(userId) {
 		const identity = this.getIdentity()
 		if (!identity) throw new Error('No enrolled credential. Call enroll() first.')
 
-		let challenge
+		let challengeHex, challengeBuf
 
 		if (this.serverUrl && userId) {
-			const res = await fetch(`${this.serverUrl}/challenge`)
+			// Challenge is now scoped to userId — prevents anonymous challenge flooding
+			const res = await fetch(`${this.serverUrl}/challenge/${userId}`)
 			const data = await res.json()
-			challenge = hexToBuf(data.challenge)
+			challengeHex = data.challenge
+			challengeBuf = hexToBuf(challengeHex)
 		} else {
-			challenge = crypto.getRandomValues(new Uint8Array(32))
+			const raw = crypto.getRandomValues(new Uint8Array(32))
+			challengeHex = bufToHex(raw)
+			challengeBuf = raw.buffer
 		}
-
-		const challengeBuf = challenge instanceof ArrayBuffer ? challenge : challenge.buffer
 
 		const assertion = await navigator.credentials.get({
 			publicKey: {
@@ -147,51 +133,51 @@ export class BioKeyClient {
 				rpId: this.rpId,
 				allowCredentials: [{ id: hexToBuf(identity.credentialId), type: 'public-key' }],
 				userVerification: 'required',
-				extensions: {
-					prf: {
-						evalByCredential: {
-							[identity.credentialId]: { first: PRF_SALT }
-						}
-					}
-				},
+				extensions: { prf: { evalByCredential: { [identity.credentialId]: { first: PRF_SALT } } } },
 				timeout: 60000
 			}
 		})
 
 		const prfOutput = extractPRFOutput(assertion)
+		let derivedKey, method
 
 		if (prfOutput) {
-			const derivedKey = bufToHex(prfOutput)
+			derivedKey = bufToHex(prfOutput)
+			method = 'prf'
 			if (identity.method === 'prf' && derivedKey !== identity.publicKey) {
 				throw new Error('PRF key mismatch — identity verification failed.')
 			}
-			if (this.serverUrl && userId) {
-				await this._serverVerify(userId, challengeBuf, identity.publicKey)
+		} else {
+			const seed = await deriveKeyRawId(assertion.rawId)
+			derivedKey = bufToHex(seed)
+			method = 'rawid'
+			if (identity.method === 'rawid' && derivedKey !== identity.publicKey) {
+				throw new Error('Key mismatch — identity verification failed.')
 			}
-			return { verified: true, publicKey: derivedKey, method: 'prf' }
 		}
 
-		// V1 fallback
-		const seed = await deriveKeyRawId(assertion.rawId)
-		const derivedKey = bufToHex(seed)
-		if (identity.method === 'rawid' && derivedKey !== identity.publicKey) {
-			throw new Error('Key mismatch — identity verification failed.')
-		}
 		if (this.serverUrl && userId) {
-			await this._serverVerify(userId, challengeBuf, identity.publicKey)
+			await this._serverVerify(userId, challengeHex, assertion, identity.publicKey)
 		}
-		return { verified: true, publicKey: identity.publicKey, method: 'rawid' }
+
+		return { verified: true, publicKey: derivedKey, method }
 	}
 
-	async _serverVerify(userId, challengeBuf, expectedKey) {
-		const challengeHex = bufToHex(challengeBuf)
+	async _serverVerify(userId, challengeHex, assertion, expectedKey) {
 		const res = await fetch(`${this.serverUrl}/verify`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ userId, challenge: challengeHex })
+			body: JSON.stringify({
+				userId,
+				challenge: challengeHex,
+				authenticatorData: bufToBase64url(assertion.response.authenticatorData),
+				clientDataJSON: bufToBase64url(assertion.response.clientDataJSON),
+				signature: bufToBase64url(assertion.response.signature)
+			})
 		})
 		const data = await res.json()
 		if (!data.verified) throw new Error('Server verification failed.')
 		if (data.publicKey !== expectedKey) throw new Error('Server public key mismatch.')
+		return data
 	}
 }
