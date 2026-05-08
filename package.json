@@ -1,0 +1,22 @@
+{
+  "name": "pow-mining-client",
+  "version": "5.0.0",
+  "description": "POW Mining Client — Sepolia faucet, Convex backend, headless Playwright browser",
+  "type": "module",
+  "scripts": {
+    "start": "node clint.js",
+    "dev": "node --watch clint.js",
+    "setup": "npm install && npx playwright install-deps chromium && npx playwright install chromium",
+    "setup:start": "npm run setup && npm start"
+  },
+  "dependencies": {
+    "axios": "^1.7.9",
+    "chalk": "^5.3.0",
+    "convex": "^1.32.0",
+    "dotenv": "^17.2.3",
+    "http-proxy-agent": "^8.0.0",
+    "https-proxy-agent": "^8.0.0",
+    "playwright": "^1.58.1",
+    "ws": "^8.19.0"
+  }
+}
